@@ -21,11 +21,27 @@ except ImportError:
     except:
         raise ImportError
 
-import timerAppController
+import timerAppController as controller
+from random import randint
 
 #list of things you wanna keep track of time for
 schedule_items = ["Item A", "Item B", "Item C"]
 
+
+texture_container = dpg.add_texture_registry(label="Texture Container")
+button_static_texture_1 = dpg.generate_uuid()
+button_static_texture_2 = dpg.generate_uuid()
+button_static_texture_3 = dpg.generate_uuid()
+
+width1, height1, channels1, data1 = dpg.load_image(r"assets\piecharticon.png")
+width2, height2, channels2, data2 = dpg.load_image(r"assets\additionicon.png")
+width3, height3, channels3, data3 = dpg.load_image(r"assets\timetableicon.png")
+
+dpg.add_static_texture(width1, height1, data1, parent=texture_container, id=button_static_texture_1)
+dpg.add_static_texture(width2, height2, data2, parent=texture_container, id=button_static_texture_2)
+dpg.add_static_texture(width3, height3, data3, parent=texture_container, id=button_static_texture_3)
+
+tooltip_pie_id = dpg.generate_uuid()
 
 #simple class that does loops to increment numbers every 1 second
 #all of the non widget related stuff probably belongs in timerAppController.py instead of here
@@ -44,6 +60,8 @@ class Timer:
 
             dpg.set_value(item=1, value=count_formatted)
 
+            dpg.set_value(item=tooltip_pie_id, value=[[task_and_time[i] for i in task_and_time]])
+
             time.sleep(1)
 
 
@@ -58,26 +76,27 @@ def get_previous_task_time(task, time):
     
     for item in schedule_items:
         if task == item:
+            print(task)
             if time != 0:
                 task_and_time[item] = task_and_time[item] + time
                 print(task_and_time)
-
+                
 
 def start_timer_loop(sender=None, app_data=None, user_data=None):
-    
-    get_previous_task_time(timer.item_being_timed, timer.count)
 
-    df = timerAppController.convert_into_df(task_and_time)
-    timerAppController.save_df(df)
+    dpg.show_item(4)
 
-    timer.item_being_timed = user_data
-    
-    timer.running = True
+    df = controller.convert_into_df(task_and_time)
+    controller.save_df(df) 
 
     if sender is not None:          #checks if the call came from a button input or a script call. If it doesn't have a sender, it's not from a  button
+        get_previous_task_time(timer.item_being_timed, timer.count)
+        timer.item_being_timed = user_data
         timer.count = 0
 
-    for i in range(4, len(schedule_items)+4):       #ensures that only one selectable is selected
+    timer.running = True
+
+    for i in range(100, len(schedule_items)+100):       #ensures that only one selectable is selected
         if i != sender and sender is not None:
             dpg.set_value(i, False)
     
@@ -94,8 +113,10 @@ def pause_timer_loop(sender, app_data, user_data):
 
     if timer.running:
         timer.running = False
+        dpg.hide_item(4)
     else:
         start_timer_loop()
+        dpg.show_item(4)
 
 
 def configure_viewport(sender, app_data, user_data):
@@ -111,17 +132,51 @@ def configure_viewport(sender, app_data, user_data):
     else:
         dpg.set_viewport_pos([1320, 120])
 
+'''widget tree'''
 
 with dpg.font_registry():
-    heading_font = dpg.add_font(r"timerapp\Roboto-Bold.ttf",25)       #adds a font from a font file that looks nicer than the default one
+    heading_font = dpg.add_font(r"fonts\Roboto-Bold.ttf",30)       #adds a font from a font file that looks nicer than the default one
+    selectable_font = dpg.add_font(r"fonts\Raleway-Medium.ttf", 15)
 
 
 #this is the root window
 with dpg.window(width=250, height=300, autosize=False,pos=[0,0],
                 no_resize=True, no_move=True, no_title_bar=True):
+    
+    dpg.add_separator()
+    
+    with dpg.drawlist(width=60, height=275, id=6):
+        #draw menu bar background
+        dpg.draw_line((0, 1), (0, 70), color=(5, 64, 136, 255), thickness=60)
+        dpg.draw_line((0, 164), (0, 285), color=(5, 64, 136, 255), thickness=60)
+        
+    dpg.add_image_button(texture_id=button_static_texture_1, pos=[8,85], background_color=[15,74,146,255],
+                         width=28, height=26,callback=lambda:print('hi'), frame_padding=1, before=6)
 
-    #draw menu bar background
-    dpg.draw_line((0, 1), (0, 285), color=(5, 64, 136, 255), thickness=60)
+    with dpg.tooltip(dpg.last_item()):
+        
+        with dpg.plot(no_title=True, no_mouse_pos=True, width=170, height=170):
+
+            dpg.add_plot_legend()
+
+            dpg.add_plot_axis(dpg.mvXAxis, label="", no_gridlines=True, no_tick_marks=True, no_tick_labels=True)
+            dpg.set_axis_limits(dpg.last_item(), 0, 1)
+
+            dpg.add_plot_axis(dpg.mvYAxis, label="", no_gridlines=True, no_tick_marks=True, no_tick_labels=True)
+            dpg.set_axis_limits(dpg.last_item(), 0, 1)
+
+            dpg.add_pie_series(0.5, 0.5, 0.5, controller.row_data(0), controller.header_names(), normalize=True, format="%.0f", parent=dpg.last_item(),
+                               id=tooltip_pie_id)
+        
+
+    dpg.add_image_button(texture_id=button_static_texture_2, pos=[8,115], background_color=[15,74,146,255],
+                         width=28, height=26,callback=lambda:print('hi'), frame_padding=1, before=6)
+
+    dpg.add_image_button(texture_id=button_static_texture_3, pos=[8,145], background_color=[15,74,146,255],
+                         width=28, height=26,callback=lambda:print('hi'), frame_padding=1, before=6)
+    
+    dpg.add_loading_indicator(id=4, pos=[12,28], radius=2, style=1)
+    dpg.hide_item(4)
     
     dpg.add_separator()
     dpg.add_spacing(count=10)
@@ -138,15 +193,16 @@ with dpg.window(width=250, height=300, autosize=False,pos=[0,0],
             dpg.add_table_column()
             dpg.add_spacing(count=3)
             dpg.add_button(label="Pause", id=2, width=50, height=20, callback=pause_timer_loop)
-            dpg.add_button(label="Reset", id=3, width=50, height=20)
+            dpg.add_button(label="Reset", id=3, width=50, height=20, callback=lambda:setattr(timer, "count", 0))
         dpg.add_same_line()
         dpg.set_item_font(item=1,font=heading_font)
         dpg.add_spacing(count=3)
         dpg.add_separator()
         dpg.add_spacing(count=3)
 
-        for count, item in enumerate(schedule_items, start=4):              #loops through the schedule_items list and makes them all into selectable widgets
+        for count, item in enumerate(schedule_items, start=100):              #loops through the schedule_items list and makes them all into selectable widgets
             dpg.add_selectable(id=count, label=item, callback=start_timer_loop, user_data=item)
+            dpg.set_item_font(item=count,font=selectable_font)
 
     with dpg.handler_registry():
         dpg.add_mouse_move_handler(callback=configure_viewport)
